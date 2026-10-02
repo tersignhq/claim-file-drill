@@ -1,0 +1,42 @@
+{
+  "batchRoot": "0xe9ff3405b9e97dafb8ae02cd3ba42024cd645c89d88f13af3aa26bb28ec87d47",
+  "leaves": [
+    {
+      "subjectDigest": "0x723df9817ce43f7b337d937567bbd6e797dffacfdb08068d79a6d42fe980aaab",
+      "subjectSchema": "tersign-chain-commitment-v1",
+      "anchoredDigest": "0xb45cc5702b939ea7e4070275839c5c4e388593115df773d7023cdde542f70f19",
+      "path": [
+        {
+          "side": "R",
+          "hash": "0x338da46ea15185e3923e4047dd4fb2ad36e08930ea4c86bb5b4a7461d18ff354"
+        }
+      ]
+    },
+    {
+      "subjectDigest": "0x6c5228bb852c8905ba252087492adf2de8788da16c224bba68832dc4d2554473",
+      "subjectSchema": "tersign-chain-commitment-v1",
+      "anchoredDigest": "0x338da46ea15185e3923e4047dd4fb2ad36e08930ea4c86bb5b4a7461d18ff354",
+      "path": [
+        {
+          "side": "L",
+          "hash": "0xb45cc5702b939ea7e4070275839c5c4e388593115df773d7023cdde542f70f19"
+        }
+      ]
+    }
+  ],
+  "ledgerSignature": "0x7f2b2cd318941da6f847debd766f8dcc9b241323a48271eb779e078bf6bd3cde22f0ff2f3dd7790865a751b810fed0f588568346abd0c441bcd3ef737a12937d1c",
+  "methods": {
+    "rfc3161": {
+      "file": "proof.tsr",
+      "tsa": "https://freetsa.org/tsr",
+      "digest": "sha256",
+      "status": "complete"
+    },
+    "opentimestamps": {
+      "file": "proof.ots",
+      "status": "calendar-pending",
+      "stamped": "batchRoot",
+      "note": "freshly stamped over the batch root; upgrades to a bitcoin attestation after calendar aggregation — path replay is offline either way"
+    }
+  }
+}

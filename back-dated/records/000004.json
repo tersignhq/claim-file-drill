@@ -1,0 +1,42 @@
+{
+  "seq": 4,
+  "format": "tersign-action-record-v1",
+  "artifact": {
+    "record": {
+      "version": 1,
+      "agent": {
+        "id": "synthetic-agent",
+        "principal": "synthetic-party-worked-example",
+        "model": "synthetic-model"
+      },
+      "action": {
+        "kind": "disclosure",
+        "name": "synthetic worked example"
+      },
+      "disclosure": {
+        "kind": "ai-interaction",
+        "presentedAt": 1787696640,
+        "medium": "chat"
+      },
+      "governance": {
+        "policyId": "synthetic-policy",
+        "outcome": "allowed"
+      },
+      "resourceUrl": "https://synthetic.example/resource/4",
+      "occurredAt": 1787696640
+    },
+    "attestation": {
+      "format": "eip712",
+      "payload": {
+        "version": 1,
+        "actionDigest": "0x510dfa798959585e1ff745e5566dec2cfa444a9b5454f95ae15ecf94bffc5791",
+        "occurredAt": 1787696640
+      },
+      "signature": "0x9d693327b9c2a2332f167e75387962fe9dfa53f68c8be3d6205db30f5ffcf5cd12859af8dfec6798a7edaa3e6922d9491850339e260b29c7f43c99b47597bb191c"
+    }
+  },
+  "artifactDigest": "0x510dfa798959585e1ff745e5566dec2cfa444a9b5454f95ae15ecf94bffc5791",
+  "prevDigest": "0x8e995e32a4eed87bdbc7da23ca239d331dbbf6d73be1c6aa3643766cf3c822a2",
+  "linkDigest": "0x02e1ec5eed08ce9413ca1be5a7a9f427fad3a41d8a68b6fffb5c7f9f5dd95187",
+  "countersignature": "0xcc408d24445e5cdc8e2952d2ffbc5c0ea702ca2a9cb904493afc57dba91a09005168ab6e99ac1666e8efdfd31d10e698478258307f84be1c17f864b8a496e6961b"
+}

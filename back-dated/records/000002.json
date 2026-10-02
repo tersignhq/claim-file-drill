@@ -1,0 +1,20 @@
+{
+  "seq": 2,
+  "format": "eip712",
+  "artifact": {
+    "format": "eip712",
+    "payload": {
+      "version": 1,
+      "network": "eip155:8453",
+      "resourceUrl": "https://synthetic.example/resource/2",
+      "payer": "synthetic:payer-2",
+      "issuedAt": 1787700120,
+      "transaction": ""
+    },
+    "signature": "0xc7ea30bc0e2aba05725c1bec1beb89f60dcf01f00cb00df7f823dfede0ca4e2856209c221157513bb1ac81e4a4ae66d44f4b7463d542fb54204be21140dcf3401c"
+  },
+  "artifactDigest": "0x0bdefc586fd0817010b7be264db2a6cc598d0d9128f966e05483199cb354f144",
+  "prevDigest": "0xe8d0c094c013c67fcaa090f276c8b90e1308f0124614a5358d509411d7e2ad42",
+  "linkDigest": "0x075318b39481377aebe0fdc07d86cec3d9bd6ef74b499c01f559d11265793108",
+  "countersignature": "0x7e855ba2100f6fa4985a2cbee68a1a177d45fe3f25307bbb358c410f2e09bbd70bac9ff1c68d7b8cb6921c10f2ecd7c9f6bd6325d1403b9b7750d2d7eccce8b21c"
+}

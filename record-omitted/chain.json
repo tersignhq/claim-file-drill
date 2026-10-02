@@ -1,0 +1,38 @@
+{
+  "partyId": "synthetic-party-worked-example",
+  "head": "0x8e995e32a4eed87bdbc7da23ca239d331dbbf6d73be1c6aa3643766cf3c822a2",
+  "acc": "0xc7e75bc94c431556fce6adfdbbc08db47234635ee938b66e998c2377b764565b",
+  "commitment": {
+    "acc": "0xc7e75bc94c431556fce6adfdbbc08db47234635ee938b66e998c2377b764565b",
+    "head": "0x8e995e32a4eed87bdbc7da23ca239d331dbbf6d73be1c6aa3643766cf3c822a2",
+    "schema": "tersign-chain-commitment-v1",
+    "seq": 3
+  },
+  "commitmentDigest": "0x2349a3689d6239b59347550bf0bcfff8c29327fb5560758751decb511756758e",
+  "coversSeqThrough": 3,
+  "links": [
+    {
+      "seq": 1,
+      "artifactDigest": "0xe8d0c094c013c67fcaa090f276c8b90e1308f0124614a5358d509411d7e2ad42",
+      "prevDigest": null,
+      "linkDigest": "0x123115fa8a57e5ce1907b1eaebc958535122edb771fb6c51fa67096cbd87a4a2",
+      "accDigest": "0x3cdac7e1f717cc72eec5f04f6eb67349d3c737af89f75d0f6393e0878b125fe9"
+    },
+    {
+      "seq": 2,
+      "artifactDigest": "0x0bdefc586fd0817010b7be264db2a6cc598d0d9128f966e05483199cb354f144",
+      "prevDigest": "0xe8d0c094c013c67fcaa090f276c8b90e1308f0124614a5358d509411d7e2ad42",
+      "linkDigest": "0x075318b39481377aebe0fdc07d86cec3d9bd6ef74b499c01f559d11265793108",
+      "accDigest": "0x7f3390ab671c2686a7f1d1394916e9d904f7a7d99024c8dbfd06a2c7243be45b"
+    },
+    {
+      "seq": 3,
+      "artifactDigest": "0x8e995e32a4eed87bdbc7da23ca239d331dbbf6d73be1c6aa3643766cf3c822a2",
+      "prevDigest": "0x0bdefc586fd0817010b7be264db2a6cc598d0d9128f966e05483199cb354f144",
+      "linkDigest": "0x8686473b783f016d0ede8a2a7035deff1b6cbe0a4d74672483d2f7d76e7eadb3",
+      "accDigest": "0xc7e75bc94c431556fce6adfdbbc08db47234635ee938b66e998c2377b764565b"
+    }
+  ],
+  "completeness": "seqs are dense 1..coversSeqThrough; each prevDigest == previous artifactDigest (null at seq 1); each linkDigest == keccak256(artifactDigest || prevDigest-or-32-zero-bytes || uint64be(seq)) and is counter-signed by the ledger; each accDigest == keccak256(previous accDigest || linkDigest) from keccak256('tersign-chain-commitment-v1'); head == last artifactDigest; acc == last accDigest; commitmentDigest == keccak256(utf8(JCS(commitment)))",
+  "attestation": "completeness is attested twice: the ledger counter-signature over each link, and the anchored commitment over the accumulator — a prefix that omits, inserts, reorders or rewrites any record changes acc and fails the anchor"
+}
