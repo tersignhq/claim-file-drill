@@ -34,9 +34,10 @@
     },
     "opentimestamps": {
       "file": "proof.ots",
-      "status": "calendar-pending",
+      "status": "complete",
       "stamped": "batchRoot",
-      "note": "freshly stamped over the batch root; upgrades to a bitcoin attestation after calendar aggregation — path replay is offline either way"
+      "bitcoinBlockHeight": 964488,
+      "note": "stamped over the batch root; upgraded with the calendars' Bitcoin attestations in blocks 964488, 964496, 964513, each checked against the block header from two block explorers; bitcoinBlockHeight is the earliest"
     }
   }
 }

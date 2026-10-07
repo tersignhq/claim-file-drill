@@ -2,14 +2,14 @@
   "schema": "tersign-evidence-bundle-v1",
   "version": "0.2.0",
   "mode": "synthetic",
-  "createdAt": "2026-09-30T08:54:02.063Z",
+  "createdAt": "2026-08-28T19:46:47.488Z",
   "party": {
     "id": "synthetic-party-worked-example",
     "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
   },
   "ledgerSigner": {
     "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    "note": "SYNTHETIC signer (well-known test key) — the production signer is published at https://tersign.ai/v1/ledger; verify authorship with --signer against that out-of-band value"
+    "note": "SYNTHETIC signer: a published test key (Hardhat/Anvil default dev-mnemonic account #1); anyone can sign with it, so a verdict bound to it stays integrity-only. Real records are counter-signed by the production signer published at https://tersign.ai/v1/ledger, not by this key"
   },
   "chain": {
     "head": "0xd3c049324ac642120146c855ac5e5c80c788602ede862b19c4ffd837c42e0349",
@@ -27,11 +27,11 @@
   },
   "files": {
     "MAPPING.md": "sha256:4a6d206f315cf8665c53548b43eb35e2bf0a787d4e13bd3eea39ae3d69bbd7f1",
-    "VERIFY.md": "sha256:3521239f1d5c52e33aee82f37c4f98c1b9001c670b1d4070742168fa9ddd324e",
-    "anchors/anchor.json": "sha256:d26dc25d1c4d2822a92b176dd7f6668bd1bcac6f2663f114d21e3baea3b77636",
+    "VERIFY.md": "sha256:7d0a7d5b1eedee8d90779d656e87c896b86c671a617a57eb8d010f646bbc6bca",
+    "anchors/anchor.json": "sha256:5f3450d09a18400e439a873bad9c03b77b433c98ee29f0d3616fbbbfe93113fe",
     "anchors/freetsa-cacert.pem": "sha256:2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438",
-    "anchors/proof.ots": "sha256:c748d3ce1a8ff1fb0260ed6116ffee0059e7757e5b5e545747cd4971f5559b99",
-    "anchors/proof.tsr": "sha256:9e6cce720de8ed19269a09284d8ab032a617a4f9d0cd59bebf052ab1712cea77",
+    "anchors/proof.ots": "sha256:e2b7117a1b30ae83460a7959780b1bcc929fdf3ff33f8f5a05f7012e3db64495",
+    "anchors/proof.tsr": "sha256:06b3969728c72870b4e59538d7cf34e555474d4a921263b7d79aa284d141b2bf",
     "chain.json": "sha256:d54d6caa83056b9f9cabdf20adf00f4f4a585e115e7f145f169550e0683bf11b",
     "records/000001.json": "sha256:1f37b203d1f10b4944d18fb140e1718a495f8f8834af62a4fc54dbe3a9307758",
     "records/000002.json": "sha256:39b99204cc4ae312409ca64a5a2eca4df5ea9d672422e3f8018c7c2ffba4105a",
@@ -39,6 +39,6 @@
     "records/000004.json": "sha256:92e04228cbd3f21657ce662eec97cb1d6c434a01bb6f51fe47fe2ffb63b034b8",
     "verify/keccak.py": "sha256:f3fa3c35a309cc7d205b09b52c883a7fa9511f831800c514d5274e100bd0e8ce",
     "verify/secp256k1.py": "sha256:e300f067a0135cf62d07e426954ccf91edb317f94eb00fdcab6ef127430ff36c",
-    "verify/verify_bundle.py": "sha256:28aea4dbd1690f3deaff00da88efb18cbe991a077258ce452407009baf750e27"
+    "verify/verify_bundle.py": "sha256:b04ff4cb71a51ee47b407a09bebe106d4ce40238590f8efa59a2463ae302973c"
   }
 }

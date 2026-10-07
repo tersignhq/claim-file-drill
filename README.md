@@ -27,7 +27,7 @@ On a Mac, run the checks before you open the archive folders in Finder: Finder c
 Each run prints one line per check (`PASS <check>` or `FAIL <check> — <detail>`) and ends with a verdict. The exit code is 0 for PASS and 1 for FAIL. The verdict lines:
 
 ```text
-intact          VERDICT: PASS (integrity-only) — the bundle is internally consistent and tamper-evident, but signer identity was read from the bundle itself. ...
+intact          VERDICT: PASS (integrity-only) — the bundle is internally consistent, but signer identity was read from the bundle itself. Its ledger key is a published test key (SIGNER above), so no --signer value establishes authorship of this archive.
 record-omitted  VERDICT: FAIL (1): anchors.leafForCommitment
 back-dated      VERDICT: FAIL (2): record[4].countersig, anchors.leafForCommitment
 ```
@@ -74,10 +74,10 @@ PASS does not show:
 - **that every event was recorded.** A record that was never sent for counter-signing leaves no gap. Selective emission is outside what counter-signing shows.
 - **that the archive is the holder's whole history.** The checker covers records 1 to N, where N is set by the anchor the archive carries, and whoever assembles an archive picks that anchor. One that stops at an earlier anchored commitment passes.
 - **that the file list is the one the archive was made with.** Nothing signs `manifest.json`. A holder can add or remove a file that is not a record, such as `MAPPING.md` or a time-stamp proof, rewrite the list, and the archive still passes.
-- **when the records existed, from the checker alone.** The checker never opens `anchors/proof.tsr` or `anchors/proof.ots`, and its `TIME:` lines say so. The time bound holds only through step 5, run against FreeTSA's own certificate: the records then existed no later than the time the token states. The copy of that certificate in `anchors/` bounds nothing, because the holder can replace it together with the token. The OpenTimestamps proof in this archive is calendar-pending, so it bounds nothing yet.
+- **when the records existed, from the checker alone.** The checker never opens `anchors/proof.tsr` or `anchors/proof.ots`, and its `TIME:` lines say so. Of this repository's steps, only step 5 gives a time bound, run against FreeTSA's own certificate: the records then existed no later than the time the token states. The copy of that certificate in `anchors/` bounds nothing, because the holder can replace it together with the token. The OpenTimestamps proof in this archive is complete: it carries Bitcoin attestations for blocks 964488, 964496 and 964513. `ots verify`, run against a Bitcoin node, gives a second bound, the earliest of those blocks; this repository's steps do not run it.
 - **that the time written inside a record was true when it was written.** The time stamp bounds when the records existed, not when the events happened.
 - **when each record was counter-signed.** A counter-signature that recovers to the counter-signer's key shows that the key signed the record, not when.
-- **who signed.** The keys here are labelled test keys, and without `--signer` the checker reads the signer addresses from the archive itself. That is why the verdict says integrity-only. On a production archive you pass the counter-signer's address, obtained separately from https://tersign.ai/v1/ledger, with `--signer`; every counter-signature and the anchor signature must then recover to that address.
+- **who signed.** The keys here are labelled test keys, and without `--signer` the checker reads the signer addresses from the archive itself. That is why the verdict says integrity-only. The keys are also published test keys, which the checker names on its `SIGNER:` lines: anyone can sign with them, so even with `--signer` set to the archive's own counter-signer the verdict stays integrity-only. On a production archive you pass the counter-signer's address, obtained separately from https://tersign.ai/v1/ledger, with `--signer`; every counter-signature and the anchor signature must then recover to that address.
 - **that the counter-signer kept one history per holder.** The no-omission result assumes the counter-signer did not sign two different histories for the same holder. Nothing inside a single archive can rule that out.
 
 In this synthetic archive the counter-signer's key is a public test key too, so anyone could make new counter-signatures and a new anchor with it. The drill shows what a holder without that key can and cannot do, which is the production case; there, `--signer` and the time stamp checked in step 5 against FreeTSA's own certificate are what a reader relies on.
@@ -101,7 +101,7 @@ It prints:
 ```text
 2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438
 Verification: OK
-Time stamp: Sep 30 08:53:58 2026 GMT
+Time stamp: Aug 28 19:46:45 2026 GMT
 ```
 
 The pin is the SHA-256 of https://freetsa.org/files/cacert.pem as fetched on 2026-10-02, which is byte-identical to the copy in `anchors/`. The download goes into a directory that `mktemp -d` has just made, and the first `python3` line gives it the name `openssl` reads only when its digest equals the pin, so `openssl` never reads a certificate that differs from it, from whichever directory you run the block, the archive's own included. `python3 -I` ignores the current directory when it imports, so a file such as `hashlib.py` placed in an archive cannot stand in for the standard library. If the download fails, or FreeTSA replaces its certificate (the `python3` line then stops with `not the pinned FreeTSA certificate`), the block stops before `openssl` runs and prints no time.

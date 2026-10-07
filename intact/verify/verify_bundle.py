@@ -22,10 +22,18 @@ the party labels the identity check compares, are printed JSON-quoted.
 TRUST ANCHOR (read this): without --signer, identity values come from the bundle's
 own manifest — PASS then proves INTEGRITY AND INTERNAL CONSISTENCY, not authorship
 (a forger with their own keys can produce a self-consistent bundle). To prove
-authorship, pass --signer with the ledger address obtained OUT-OF-BAND (published:
-https://tersign.ai/v1/ledger); the verifier then binds
-every counter-signature and the anchor signature to THAT address and fails if the
-manifest disagrees. --party does the same for the party authorization key.
+authorship, pass --signer with the ledger address obtained OUT-OF-BAND (production
+records: https://tersign.ai/v1/ledger); the verifier then binds every counter-signature
+and the anchor signature to THAT address and fails if the manifest disagrees. --party
+does the same for the party's current key, and the verdict names it only when a party
+signature recovers to it; every party key it does not bind (all of them without --party,
+earlier key runs with it) is the bundle's own claim and prints on the UNAUTHENTICATED line.
+The verdict says "integrity AND authorship" only when every counter-signature recovers to
+--signer and EVERY party signature recovers to --party; otherwise it says "integrity AND
+counter-signer authorship" or integrity-only. A published test key
+(PUBLISHED_TEST_KEYS below) binds nothing, passed as --signer or as --party: anyone can
+sign with it. A test --signer keeps the verdict integrity-only, a test --party key is
+named as establishing no party authorship, and a SIGNER line says why for each.
 
 Exit 0 = every check PASS. Exit 1 = any FAIL. No network. No third-party imports.
 """
@@ -39,7 +47,7 @@ import unicodedata
 
 # The sibling imports below must not leave bytecode beside them: a verify/__pycache__/ written
 # into the bundle is an unlisted file, and the closed-set check would then fail the very bundle
-# it was run on (as it did, on a stock CPython, for the archive's own genuine bytes).
+# it is run on, genuine bytes included, on any CPython that caches bytecode.
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from keccak import keccak256 as keccak_256  # noqa: E402
@@ -62,6 +70,47 @@ METHOD_STATUSES = ("complete", "calendar-pending", "omitted", "unavailable-at-bu
 # bundle's copy on 2026-10-02.
 FREETSA_CA_URL = "https://freetsa.org/files/cacert.pem"
 FREETSA_CA_SHA256 = "2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438"
+
+# Signer addresses whose private keys are PUBLISHED, so anyone can sign as them: the twenty
+# accounts of the Hardhat/Anvil default dev mnemonic ("test test ... junk", m/44'/60'/0'/0/i)
+# and private keys 1, 2 and 3. A signature from one of them recovers like any other, so a
+# --signer naming one binds nothing: whoever reads the published secret can counter-sign,
+# re-sign and re-anchor a truncated or rewritten archive under it, and every check above still
+# passes. Same table, address for address and label for label, as PUBLISHED_TEST_KEYS in the
+# Tersign SDKs (npm and PyPI package `tersign`), which re-derive it from the published secrets;
+# a build test compares this copy with theirs, so a key added on one side fails there.
+_DEV_MNEMONIC_ADDRESSES = (
+    "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
+    "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+    "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc",
+    "0x90f79bf6eb2c4f870365e785982e1f101e93b906",
+    "0x15d34aaf54267db7d7c367839aaf71a00a2c6a65",
+    "0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc",
+    "0x976ea74026e726554db657fa54763abd0c3a0aa9",
+    "0x14dc79964da2c08b23698b3d3cc7ca32193d9955",
+    "0x23618e81e3f5cdf7f54c3d65f7fbc0abf5b21e8f",
+    "0xa0ee7a142d267c1f36714e4a8f75612f20a79720",
+    "0xbcd4042de499d14e55001ccbb24a551f3b954096",
+    "0x71be63f3384f5fb98995898a86b02fb2426c5788",
+    "0xfabb0ac9d68b0b445fb7357272ff202c5651694a",
+    "0x1cbd3b2770909d4e10f157cabc84c7264073c9ec",
+    "0xdf3e18d64bc6a983f673ab319ccae4f1a57c7097",
+    "0xcd3b766ccdd6ae721141f452c550ca635964ce71",
+    "0x2546bcd3c84621e976d8185a91a922ae77ecec30",
+    "0xbda5747bfd65f08deb54cb465eb87d40e51b197e",
+    "0xdd2fd4581271e230360230f9337d5c0430bf44c0",
+    "0x8626f6940e2eb28930efb4cef49b2d1f2c9c1199",
+)
+_SMALL_SCALAR_ADDRESSES = (
+    "0x7e5f4552091a69125d5dfcb7b8c2659029395bdf",
+    "0x2b5ad5c4795c026514f8317c7a215e218dccd6cf",
+    "0x6813eb9362372eef6200f3b1dbc3f819671cba69",
+)
+PUBLISHED_TEST_KEYS = {
+    **{a: "Hardhat/Anvil default dev mnemonic, account #%d" % i
+       for i, a in enumerate(_DEV_MNEMONIC_ADDRESSES)},
+    **{a: "private key 0x%x (a small scalar)" % (i + 1) for i, a in enumerate(_SMALL_SCALAR_ADDRESSES)},
+}
 FAILS = []
 
 
@@ -69,9 +118,9 @@ class BundleShapeError(Exception):
     """A malformed bundle. Raised instead of letting a KeyError, TypeError or FileNotFoundError
     escape: this file is fetched from tersign.ai and run by strangers on evidence they did not
     produce, and a traceback at that moment spends the credibility of an evidence tool on an
-    unhandled shape. Nine such inputs did exactly that, two of them printing sixty PASS lines
-    and then no VERDICT at all — which reads far worse than a clean FAIL, because it leaves the
-    reader unable to say what the tool concluded."""
+    unhandled shape. An unhandled shape can print a run of PASS lines and then no VERDICT at
+    all, which reads far worse than a clean FAIL, because it leaves the reader unable to say
+    what the tool concluded."""
 
 
 
@@ -207,8 +256,8 @@ def _no_dupes(pairs):
 
 
 def load_json(path):
-    """The ONE way this file reads JSON. Every load goes through here so a new call site cannot
-    quietly reintroduce last-wins parsing."""
+    """The ONE way this file reads JSON. Every load goes through here, so no call site can parse
+    last-wins."""
     with open(path, "rb") as fh:
         return json.loads(fh.read().decode("utf8"), object_pairs_hook=_no_dupes)
 
@@ -243,8 +292,8 @@ def _time_lines(bundle, anc, root, ondisk):
     """The TIME lines printed under a PASS. They report what anchor.json CLAIMS for each
     time-stamp method and nothing stronger: this tool never opens proof.tsr or proof.ots, so
     it cannot say when anything existed. Every value from anchor.json is printed quoted (q):
-    only the batch root is signed, and a status or a method name holding a newline once printed
-    a TIME line of the holder's choosing beside a PASS.
+    only the batch root is signed, and a status or a method name holding a newline could
+    otherwise print a TIME line of the holder's choosing beside a PASS.
 
     The RFC 3161 commands read the digest from THIS bundle's anchor.json (never a value typed in
     elsewhere), so a bundle whose batch root was swapped fails them instead of borrowing another
@@ -254,10 +303,10 @@ def _time_lines(bundle, anc, root, ondisk):
     verify against each other at any time the holder picks.
 
     The commands are chained with && and the certificate lives in a directory mktemp -d has just
-    made, because a reader runs them from wherever they are, the holder's bundle included. Round 3
-    wrote the certificate to the current directory in unchained lines: a holder's own CA planted
-    there as freetsa-cacert.pem survived a failed download or a pin miss, and openssl printed
-    Verification: OK on a forged token. python3 runs with -I so no module in the current
+    made, because a reader runs them from wherever they are, the holder's bundle included. Were
+    the certificate written to the current directory in unchained lines, a holder's own CA planted
+    there as freetsa-cacert.pem would survive a failed download or a pin miss, and openssl would
+    print Verification: OK on a forged token. python3 runs with -I so no module in the current
     directory (a planted hashlib.py or json.py) stands in for the standard library. The time
     prints only after a successful verify."""
     methods = anc.get("methods") or {}
@@ -337,18 +386,18 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
     # Action records are attested by the party's action-record key; it defaults to the receipt
     # signer and is named separately only when the party's keys differ.
     #
-    # SECURITY (2026-08-30): actionSigner is BUNDLE-SUPPLIED, so it may not silently override
-    # the address the operator pinned out-of-band. It did, and the consequence was full
-    # impersonation: any party holding a Tersign account submits their OWN action records —
-    # genuinely counter-signed and anchored by the real ledger — then writes a manifest naming
-    # the victim as party.signer and themselves as party.actionSigner. trust.partySigner==--party
-    # passed (both said victim), every record[k].partySig passed (against the attacker's key),
-    # every counter-signature and the anchor passed against the real ledger, and the tool printed
-    # PASS - integrity AND authorship for records the named party never signed.
+    # SECURITY: actionSigner is BUNDLE-SUPPLIED, so it may not silently override the address the
+    # operator pinned out-of-band. If it could, the consequence would be full impersonation: any
+    # party holding a Tersign account could submit their OWN action records — genuinely
+    # counter-signed and anchored by the real ledger — then write a manifest naming the victim as
+    # party.signer and themselves as party.actionSigner. trust.partySigner==--party would pass
+    # (both say victim), every record[k].partySig would pass (against the attacker's key), every
+    # counter-signature and the anchor would pass against the real ledger, and the verdict would
+    # attribute to the named party records it never signed.
     #
-    # The rule the file already applies to `signers` runs twelve lines below is the right one and
-    # is simply applied here too: exactly one key is bound out-of-band, and anything the bundle
-    # says about a DIFFERENT key is the bundle's own claim. When --party is given, a divergent
+    # The rule applied to the `signers` runs below applies here too: exactly one key is bound
+    # out-of-band, and anything the bundle says about a DIFFERENT key is the bundle's own claim.
+    # When --party is given, a divergent
     # actionSigner is a FAIL, not a redirection. Without --party nothing is bound out-of-band
     # anyway, so the bundle's own value stands and the verdict stays integrity-only.
     m_action_signer = manifest["party"].get("actionSigner")
@@ -364,13 +413,6 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
     # --party binds out-of-band) must be the CURRENT run's key. Only that one key is bound
     # out-of-band — earlier runs are the bundle's own claim of the party's key history.
     signer_runs = manifest["party"].get("signers")
-    if signer_runs is not None:
-        runs = sorted(signer_runs, key=lambda x: x["seqFrom"])
-        tiles = all(runs[i]["seqFrom"] == (1 if i == 0 else runs[i - 1]["seqThrough"] + 1) and runs[i]["seqFrom"] <= runs[i]["seqThrough"]
-                    for i in range(len(runs))) and bool(runs)
-        check("manifest.party.signers.tiles", tiles, str([(r["seqFrom"], r["seqThrough"]) for r in runs]))
-        check("manifest.party.signers.currentIsSigner", bool(runs) and str(runs[-1]["address"]).lower() == m_party,
-              str(runs[-1]["address"]) if runs else "empty")
 
     def receipt_signer_for(seq):
         if signer_runs is None:
@@ -386,10 +428,22 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
     # 4a — density + records-file closure + manifest summary reconciliation
     seqs = [r["seq"] for r in links]
     # A zero-record bundle satisfies every relational check vacuously — no link is out of
-    # order when there are no links — and reached PASS with no ledger key at all. The other
-    # three implementations refuse seq < 1; this one now agrees with them.
+    # order when there are no links — and would reach PASS with no ledger key at all. This
+    # verifier refuses seq < 1, as the other three implementations do.
     check("chain.nonEmpty", len(seqs) >= 1, "a bundle must contain at least one record")
     check("chain.density", seqs == list(range(1, len(seqs) + 1)), str(seqs))
+    # The key runs tile 1..N exactly, N read from chain.json, so the last run (the key --party binds)
+    # ends at the last record. A last run past N covers no record: runs [1..3: A] [4..4: Y] over a
+    # three-record chain would let every receipt recover to A while --party Y passes its own check.
+    runs_tile = True      # no key runs: one key, nothing to tile
+    if signer_runs is not None:
+        runs = sorted(signer_runs, key=lambda x: x["seqFrom"])
+        runs_tile = tiles = all(runs[i]["seqFrom"] == (1 if i == 0 else runs[i - 1]["seqThrough"] + 1) and runs[i]["seqFrom"] <= runs[i]["seqThrough"]
+                    for i in range(len(runs))) and bool(runs) and runs[-1]["seqThrough"] == len(seqs)
+        check("manifest.party.signers.tiles", tiles,
+              "%s, records 1..%d" % ([(r["seqFrom"], r["seqThrough"]) for r in runs], len(seqs)))
+        check("manifest.party.signers.currentIsSigner", bool(runs) and str(runs[-1]["address"]).lower() == m_party,
+              str(runs[-1]["address"]) if runs else "empty")
     check("chain.coversSeqThrough", chain["coversSeqThrough"] == len(seqs))
     check("manifest.chain.reconciled",
           manifest["chain"].get("coversSeqThrough") == len(seqs)
@@ -413,6 +467,7 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
     prev = None           # previous artifactDigest; null at seq 1 (one wire form with /verify)
     acc = ACC_GENESIS
     head = None
+    party_keys = set()    # the keys the party signatures recovered to, for the UNAUTHENTICATED line
     for r in links:
         rec_path = os.path.join(bundle, "records", "%06d.json" % r["seq"])
         try:
@@ -468,6 +523,7 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
             else:
                 addr = ec.recover_address(receipt_eip712_digest(art["payload"]), art["signature"])
                 check("record[%d].partySig" % r["seq"], addr.lower() == receipt_signer_for(r["seq"]), addr)
+            party_keys.add(addr.lower())
         except Exception as e:  # noqa: BLE001
             check("record[%d].partySig" % r["seq"], False, str(e))
 
@@ -509,7 +565,7 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
           "manifest=%s anchor.json=%s" % (sorted(declared), sorted(present)))
     # Each method's status is one of the spec's five. Nothing signs anchor.json's method table,
     # and its values are printed beside a PASS, so a status outside the enum is a FAIL here
-    # rather than free text there (a status holding "\nTIME: ..." once printed a TIME line).
+    # rather than free text there (a status holding "\nTIME: ..." would otherwise print a TIME line).
     off_enum = [(name, meta.get("status") if isinstance(meta, dict) else meta)
                 for name, meta in sorted(anc.get("methods", {}).items())
                 if not (isinstance(meta, dict) and meta.get("status") in METHOD_STATUSES)]
@@ -552,12 +608,11 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
           "ledger signer, and each is folded, in order, into the anchored commitment (seq <= %d). "
           "Records after %d, if any, are outside this archive and outside this verdict."
           % (len(links), len(links), len(links)))
-    # 8 — time. This tool never opens a time-stamp proof (proof.tsr, proof.ots). It used to print
-    # "existence of every record is bound by that anchor's time" whenever anchor.json NAMED a
-    # method and the merkle path replayed: a junk proof.tsr, or none at all once the manifest was
-    # rewritten, printed the same line. So it now reports each method as anchor.json's own claim,
-    # says whether the proof file is in the bundle, and prints the command that checks the token.
-    # A verdict must never be stronger than its checks — including ours.
+    # 8 — time. This tool never opens a time-stamp proof (proof.tsr, proof.ots). A method NAMED in
+    # anchor.json and a merkle path that replays say nothing about when: a junk proof.tsr, or none
+    # at all once the manifest is rewritten, replays the same path. So this reports each method as
+    # anchor.json's own claim, says whether the proof file is in the bundle, and prints the command
+    # that checks the token. A verdict must never be stronger than its checks — including ours.
     for line in _time_lines(bundle, anc, root, ondisk):
         say(line)
     if signer_runs is not None:
@@ -566,13 +621,68 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
               % len(signer_runs))
     # The honest half of a PASS: what the bundle ASSERTS but nothing binds. A verifier that
     # prints "authorship" while these ride free is the failure this block exists to prevent.
+    # The party keys belong here: each party signature recovers to a key the manifest names, and
+    # only --party binds one of them (the current key) out-of-band; every other one is listed.
+    unbound_party = sorted(k for k in party_keys if not (expected_party and k == expected_party.lower()))
     say("UNAUTHENTICATED (the bundle's own claims — consistent, but bound by no signature): "
-          "party.id=%s · mode=%s · createdAt=%s%s"
+          "party.id=%s · mode=%s · createdAt=%s%s%s"
           % (q(manifest.get("party", {}).get("id")), q(manifest.get("mode")), q(manifest.get("createdAt")),
-             "" if signer_runs is None else " · party.signers[] earlier runs"))
-    if expected_ledger:
-        say("VERDICT: PASS — integrity AND authorship: signatures bind to the "
-              "out-of-band signer %s. Time bound: VERIFY.md sections 2-3." % expected_ledger)
+             "" if signer_runs is None else " · party.signers[] earlier runs",
+             "" if not unbound_party else " · party keys=%s (the party signatures recover to these; the "
+             "bundle names them and nothing out-of-band binds them)" % q(unbound_party)))
+    # A published test key binds nothing (PUBLISHED_TEST_KEYS): a holder who reads its secret can
+    # re-sign and re-anchor a truncated or rewritten archive, and every check above still passes.
+    # Both values are recovered addresses at this point (a PASS required the anchor signature and
+    # each party signature to recover to them), so they print as the tool's own words.
+    ledger_label = PUBLISHED_TEST_KEYS.get(ledger_signer)
+    if ledger_label:
+        say("SIGNER: the ledger key %s is a published test key (%s): anyone can sign with it, so its "
+            "counter-signatures and anchor signature establish no authorship. Only an external time "
+            "anchor, checked against its own authority (VERIFY.md section 2), can show that these "
+            "records predate a re-signing." % (ledger_signer, ledger_label))
+    for key in sorted(party_keys):
+        if key in PUBLISHED_TEST_KEYS:
+            say("SIGNER: the party key %s is a published test key (%s): anyone can sign with it, so "
+                "the party signatures that recover to it establish no authorship."
+                % (key, PUBLISHED_TEST_KEYS[key]))
+    # The party clause says only what was recovered. --party binds a key only when a party signature
+    # actually recovered to it (and, with key runs, the runs tile 1..N, checked above), never on the
+    # strength of the argument alone. A published test key binds no party authorship either.
+    party_bound = bool(expected_party) and expected_party.lower() in party_keys and runs_tile
+    if not expected_party:
+        party_clause = "the party signatures recover to keys the bundle itself names (UNAUTHENTICATED above)"
+    elif not party_bound:
+        party_clause = "no party signature recovers to the --party key %s" % expected_party
+    elif expected_party.lower() in PUBLISHED_TEST_KEYS:
+        party_clause = ("the party signatures recover to the --party key %s, a published test key "
+                        "(SIGNER above), so they establish no party authorship%s"
+                        % (expected_party, "; others recover to the keys listed UNAUTHENTICATED above"
+                           if unbound_party else ""))
+    else:
+        party_clause = "the party signatures recover to the out-of-band --party key %s%s" % (
+            expected_party, " and to the keys listed UNAUTHENTICATED above" if unbound_party else "")
+    # "authorship" unqualified only when every counter-signature recovers to --signer and EVERY
+    # party signature recovers to --party, both keys outside the published test keys; a party
+    # signature under an earlier key run (unbound_party) leaves the head qualified.
+    party_authored = party_bound and expected_party.lower() not in PUBLISHED_TEST_KEYS and not unbound_party
+    if expected_ledger and not ledger_label and (party_bound or not expected_party):
+        say("VERDICT: PASS — integrity AND %s: every counter-signature and the anchor signature "
+            "recover to the out-of-band signer %s; %s. Time bound: VERIFY.md sections 2-3."
+            % ("authorship" if party_authored else "counter-signer authorship", expected_ledger, party_clause))
+    elif expected_ledger and not ledger_label:
+        say("VERDICT: PASS (integrity-only) — every counter-signature and the anchor signature recover "
+            "to the out-of-band signer %s, but %s, so authorship is not established. Time bound: "
+            "VERIFY.md sections 2-3." % (expected_ledger, party_clause))
+    elif expected_ledger:
+        say("VERDICT: PASS (integrity-only) — every counter-signature and the anchor signature recover "
+            "to %s, the --signer you passed, but it is a published test key (SIGNER above), so "
+            "authorship is not established; %s. Time bound: VERIFY.md sections 2-3."
+            % (expected_ledger, party_clause))
+    elif ledger_label:
+        say("VERDICT: PASS (integrity-only) — the bundle is internally consistent, but signer "
+              "identity was read from the bundle itself. Its ledger key "
+              "is a published test key (SIGNER above), so no --signer value establishes authorship "
+              "of this archive.")
     else:
         say("VERDICT: PASS (integrity-only) — the bundle is internally consistent and "
               "tamper-evident, but signer identity was read from the bundle itself. "
@@ -596,9 +706,8 @@ if __name__ == "__main__":
     # A help flag must answer, never be treated as a bundle directory. This file is fetched from
     # tersign.ai and run by strangers on evidence they did not produce; --help is the first thing
     # any of them types, and a Python traceback at that moment is the whole credibility of an
-    # evidence tool spent on an unhandled argument. The no-args and trailing-flag cases were
-    # already guarded — this one was simply not thought of, so it is now checked mechanically
-    # rather than remembered.
+    # evidence tool spent on an unhandled argument. The no-args, help-flag and trailing-flag cases
+    # are each answered here, and an entry-point check runs every one of them.
     if not args or args[0] in ("-h", "--help", "help"):
         print(__doc__)
         sys.exit(0 if args else 2)

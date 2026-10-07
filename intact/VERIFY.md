@@ -1,7 +1,10 @@
-# Verify this bundle — fully offline
+# Verify this bundle
 
-Everything below runs from this directory with no Tersign dependency. Section 1 needs no
-network; sections 0 and 2 fetch the published verifier and FreeTSA's certificate.
+Everything below runs from this directory. Section 1 is the bundled check: Python's standard
+library only, no network and nothing fetched from Tersign. Section 0 fetches the published
+verifier from tersign.ai, compares it with the bundled copy and runs it instead; section 2
+fetches FreeTSA's certificate; section 3 contacts the OpenTimestamps calendars only to upgrade
+a pending proof.
 
 ## What PASS means (read first)
 
@@ -19,10 +22,33 @@ Nothing inside a single bundle can rule that out; that is a property of
 the ledger's publication, not of this archive. **Authorship is a
 separate question**: signer identity read from the bundle itself proves nothing
 (a forger can ship a self-consistent bundle under their own keys). To prove
-authorship, obtain the ledger signer address **out-of-band** — published at
-`https://tersign.ai/v1/ledger` — and pass it explicitly. A synthetic worked example uses labeled test
-keys (`manifest.mode`); a production bundle's `--signer` value is the published
-production address.
+authorship, obtain the ledger signer address **out-of-band** and pass it as `--signer`;
+every counter-signature and the anchor signature must then recover to it. Pick the address
+by **where you got the archive**, never by a field inside it: `manifest.mode` and every other
+manifest field are the holder's own words, which the verifier prints as `UNAUTHENTICATED`.
+
+- **The synthetic worked example Tersign publishes** (this archive, if that is where it came
+  from): its keys are **published test keys**. Its ledger key is Hardhat/Anvil
+  default dev-mnemonic account #1, `0x70997970C51812dc3A010C7d01b50e0d17dc79C8`; pass that
+  address to run the `--signer` path. Every check passes, and the verdict stays
+  `PASS (integrity-only)`, with a `SIGNER:` line saying why: anyone can sign with a published
+  key, so its signatures show no authorship, and only the time stamp of section 2 can show
+  that the records predate a re-signing.
+- **Real records**: pass the production ledger address published at
+  `https://tersign.ai/v1/ledger`, fetched yourself. Passed to the synthetic example, that
+  address fails `trust.ledgerSigner==--signer`, every `record[n].countersig` and
+  `anchors.ledgerSignature` (six checks in the four-record worked example), which is the right
+  result: the synthetic records were not signed with it.
+
+The keys the verifier names as published test keys are the twenty accounts of the standard
+development mnemonic that Hardhat and Anvil ship (`test test … junk`) and private keys 1, 2 and
+3. The list is not the boundary: a signer whose private key is known to anyone else, listed or
+not, establishes no authorship either, and the verifier cannot tell.
+
+`--party` does the same for the party's current key, and the verdict names that key only when
+a party signature recovers to it; a `--party` key that is a published test key establishes no
+party authorship, and the verdict says so. Without `--party`, the keys the party signatures
+recover to are the bundle's own claim, and the `UNAUTHENTICATED` line lists them.
 
 PASS does **not** show:
 
@@ -68,7 +94,9 @@ bundle (`-x` leaves out `SHA256SUMS`, which `verify/` does not carry), and a dif
 itself the finding. The published copy is the same source, kept byte-identical by a build
 check; ordinary fixes ship in place and move the digests in `SHA256SUMS`, so diffing that file
 is how you notice. The same caution is why section 2 never uses `anchors/freetsa-cacert.pem`:
-it fetches FreeTSA's own certificate.
+it fetches FreeTSA's own certificate. For the `--signer` placeholder, here and in section 1,
+see "What PASS means" above: the published test-key address for a synthetic archive, the
+address from `https://tersign.ai/v1/ledger` for real records.
 
 ## 1. Structural + cryptographic checks (python, stdlib only)
 
@@ -78,8 +106,15 @@ python3 verify/verify_bundle.py . --signer <ledger address obtained out-of-band>
 
 Expected: every line `PASS`, a `SCOPE:` line naming the committed range, `TIME:`
 lines (the anchor's time-stamp claims, unverified by this tool, and the section-2
-command for this bundle), final line `VERDICT: PASS`. Omitting `--signer` still runs every check but the verdict
-is explicitly downgraded to `PASS (integrity-only)`. Covered: closed file set +
+command for this bundle), an `UNAUTHENTICATED` line (the bundle's own claims nothing signs,
+including the party keys unless `--party` binds them), a `SIGNER:` line for each published
+test key the signatures recover to, final line `VERDICT: PASS`. The verdict names what it
+binds: with `--signer`, every counter-signature and the anchor signature recover to that
+address (`integrity AND counter-signer authorship`); it says `integrity AND authorship` only
+when EVERY party signature also recovers to the `--party` key, and neither key is a published
+test key. A party signature under an earlier key run (`manifest.party.signers`) recovers to a
+key nothing binds, so it keeps the verdict at `counter-signer authorship`. Omitting `--signer` still runs every check but the verdict is explicitly downgraded
+to `PASS (integrity-only)`, and so is a `--signer` that is a published test key. Covered: closed file set +
 per-file sha256, artifact digests (RFC 8785 + Keccak-256; receipts digest the
 signed artifact, action records digest `artifact.record`), party EIP-712
 recovery per format, chain density / `prevDigest == previous artifactDigest`
@@ -161,7 +196,7 @@ ots info anchors/proof.ots         # offline parse; a confirmed proof prints its
   recovers the ledger key
 - an anchor proof over a different root → `anchors.merklePath` / step-2 FAIL
 - a gapped or forked chain → `chain.density` / `record[n].prevDigest` FAIL
-- an extra or missing file (decoys included) → `files.closedSet` FAIL
+- an extra or missing file (decoys included, at the top level or in a folder) → `files.closedSet` FAIL
 - a manifest that overstates the record count → `manifest.chain.reconciled` FAIL
 - `prevDigest` chained on the previous **link** digest instead of the previous **artifact** digest → `record[2].prevDigest` FAIL
 - the party named in `chain.json` relabelled away from the one in `manifest.json` → `identity.partyIdConsistent` FAIL
@@ -173,12 +208,16 @@ ots info anchors/proof.ots         # offline parse; a confirmed proof prints its
 - a substituted, re-counter-signed prefix (record 1 rewritten, every link re-counter-signed under the ledger key, so the head is unchanged and every signature recovers) whose `chain.json` still claims the anchored commitment → `chain.acc`, `chain.commitment`, `chain.commitmentDigest` and `anchors.leafForCommitment` FAIL, four in all: the anchored commitment is what catches it
 - a truncated prefix with `chain.json` and the manifest recomputed to match it → `anchors.leafForCommitment` FAIL, and nothing else: no leaf in the anchor carries that commitment, while every file the holder rewrote agrees with itself
 - a prefix that stops at an **earlier anchored commitment**, shipped with that earlier anchor → PASS: the verdict covers records 1 to `coversSeqThrough` and says nothing about later ones
+- party key runs (`manifest.party.signers`) that do not tile 1 to the last record, the last run included → `manifest.party.signers.tiles` FAIL
+- a truncated or rewritten archive re-counter-signed and re-anchored under a **published test key**, with that key's address passed as `--signer` → PASS on every check, because anyone can sign with that key; the verdict stays `PASS (integrity-only)` and a `SIGNER:` line names the key. Only section 2 tells it apart from the original: the original token covers the original batch root, not the new one, and a fresh token over the new root states a later time
 
-The build that produced this bundle ran `reject-tests.sh` cases 1–26 against it (24
-rejecting cases and their accepting twins 15 and 23) and the substituted-prefix case. Together they cover every rejecting class above except
-two added after it was built, which `reject-tests.sh` runs against this bundle: the recomputed
-truncated prefix (case 27) and the status outside the five (case 28, with case 29, a status
-from the five, as its accepting twin). Each case requires the named check to fail; the full
+`reject-tests.sh` cases 1–38 run against this bundle and cover every class above except the
+prefix shipped with an earlier anchor, which needs an anchor this archive does not carry. The
+archive re-signed under a published test key (case 31, which requires the `SIGNER:` line and
+refuses any verdict claiming authorship) has the same archive under a ledger key outside the
+published table as its accepting twins: without `--party` (32), with a `--party` key that is a published
+test key (33), with one that is not (36), and with an earlier party key run under a third key
+(37). Each rejecting case requires the named check to fail; the full
 sets of five and four FAIL lines above are what the verifier printed when run on those shapes.
 Each re-encoding class sits beside an accepting twin (upper-case hex digits behind `0x`) —
 two-sided by policy, because an all-happy-path artifact proves nothing. Reproduce
@@ -201,7 +240,7 @@ unsigned claims on the `TIME:` and `UNAUTHENTICATED` lines are printed JSON-quot
 | `trust.ledgerSigner==--signer` | with `--signer`: the manifest's ledger signer is the address you passed |
 | `trust.partySigner==--party` | with `--party`: the manifest's party signer is the address you passed |
 | `trust.actionSigner==--party` | with `--party`: a separately named action-record key is that same address |
-| `manifest.party.signers.tiles` | the party's listed key runs start at seq 1 and follow on with no gap or overlap |
+| `manifest.party.signers.tiles` | the party's listed key runs start at seq 1, follow on with no gap or overlap, and the last ends at the last record |
 | `manifest.party.signers.currentIsSigner` | the last key run is `manifest.party.signer` |
 | `chain.nonEmpty` | the chain holds at least one record |
 | `chain.density` | the chain's seqs are exactly 1 to N |
