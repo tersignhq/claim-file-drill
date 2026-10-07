@@ -46,22 +46,29 @@ PASS does **not** show:
 
 `verify/` ships inside the bundle it checks. That is fine for a worked example, and it is
 **not** the right posture for evidence handed to you by an interested party: a bundle can
-ship a checker that blesses it. For adversarial input, fetch the verifier out-of-band and run
-that copy against the archive:
+ship a checker that blesses it. For adversarial input, fetch the verifier out-of-band, into a
+new directory outside this one, and run that copy against the archive:
 
 ```bash
 base=https://tersign.ai/verify/v1
-mkdir -p oob && curl -fsSL "$base/SHA256SUMS" -o oob/SHA256SUMS
-for f in verify_bundle.py keccak.py secp256k1.py; do curl -fsSL "$base/$f" -o "oob/$f"; done
-( cd oob && shasum -a 256 -c SHA256SUMS )      # published digests must match what you fetched
-python3 oob/verify_bundle.py . --signer <ledger address obtained out-of-band>
+OOB=$(mktemp -d) &&
+curl -fsSL "$base/SHA256SUMS" -o "$OOB/SHA256SUMS" &&
+for f in verify_bundle.py keccak.py secp256k1.py; do curl -fsSL "$base/$f" -o "$OOB/$f"; done &&
+( cd "$OOB" && shasum -a 256 -c SHA256SUMS ) &&
+python3 "$OOB/verify_bundle.py" . --signer <ledger address obtained out-of-band> &&
+diff -r -x SHA256SUMS "$OOB" verify
 ```
 
-Compare `oob/` against `verify/` (`diff -r oob verify`) — on an honest bundle they are
-identical, and a difference is itself the finding. The published copy is the same source, kept
-byte-identical by a build check; ordinary fixes ship in place and move the digests in
-`SHA256SUMS`, so diffing that file is how you notice. The same caution is why section 2
-never uses `anchors/freetsa-cacert.pem`: it fetches FreeTSA's own certificate.
+Each command runs only if the one before it succeeded, so the block exits 0 only when the
+published digests match what you fetched, the fetched verifier passes the archive, and the
+bundled `verify/` is byte-identical to the fetched copy. The fetch goes into the directory
+`mktemp -d` has just made, never into this one: a file written here is one `manifest.json`
+does not list, and `files.closedSet` fails on it. The last line prints nothing on an honest
+bundle (`-x` leaves out `SHA256SUMS`, which `verify/` does not carry), and a difference is
+itself the finding. The published copy is the same source, kept byte-identical by a build
+check; ordinary fixes ship in place and move the digests in `SHA256SUMS`, so diffing that file
+is how you notice. The same caution is why section 2 never uses `anchors/freetsa-cacert.pem`:
+it fetches FreeTSA's own certificate.
 
 ## 1. Structural + cryptographic checks (python, stdlib only)
 

@@ -27,7 +27,7 @@
   },
   "files": {
     "MAPPING.md": "sha256:4a6d206f315cf8665c53548b43eb35e2bf0a787d4e13bd3eea39ae3d69bbd7f1",
-    "VERIFY.md": "sha256:093ce866673035f2219c55b9375ffe056b2777dc7e859a667f35539ecf6ebfd4",
+    "VERIFY.md": "sha256:3521239f1d5c52e33aee82f37c4f98c1b9001c670b1d4070742168fa9ddd324e",
     "anchors/anchor.json": "sha256:d26dc25d1c4d2822a92b176dd7f6668bd1bcac6f2663f114d21e3baea3b77636",
     "anchors/freetsa-cacert.pem": "sha256:2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438",
     "anchors/proof.ots": "sha256:c748d3ce1a8ff1fb0260ed6116ffee0059e7757e5b5e545747cd4971f5559b99",
