@@ -22,6 +22,8 @@ python3 verify/verify_bundle.py record-omitted
 python3 verify/verify_bundle.py back-dated
 ```
 
+On a Mac, run the checks before you open the archive folders in Finder: Finder can add a `.DS_Store` file to a folder it shows, and the checker fails any file that the archive's `manifest.json` does not name (`FAIL files.closedSet`).
+
 Each run prints one line per check (`PASS <check>` or `FAIL <check> — <detail>`) and ends with a verdict. The exit code is 0 for PASS and 1 for FAIL. The verdict lines:
 
 ```text
