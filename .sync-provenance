@@ -2,7 +2,7 @@
 # This directory is a SNAPSHOT of a private source tree, not a place to author changes.
 # Edit the source, then release; anything committed here is deleted by the next sync, and
 # the fingerprint below is what makes that deletion fail closed instead of happening silently.
-version: drill-483b687
-source_commit: 483b68758b1795b3432ee7dccb4705b6038b0658
-synced_at: 2026-10-07T11:29:03Z
-tree_sha256: 6ceaff6ac0f50f035823c8c0299c47352a02f6149a3ec654ab43e74f328adfa9
+version: drill-cdbc4ad
+source_commit: cdbc4adea2f94261b2e2cbc0bb5dc502c63cfaea
+synced_at: 2026-10-09T01:41:51Z
+tree_sha256: 68c9bf13c1750f174614da1f86f59422d69b586605a7f1c94fad16b23add4dae

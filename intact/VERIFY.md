@@ -73,12 +73,15 @@ PASS does **not** show:
 `verify/` ships inside the bundle it checks. That is fine for a worked example, and it is
 **not** the right posture for evidence handed to you by an interested party: a bundle can
 ship a checker that blesses it. For adversarial input, fetch the verifier out-of-band, into a
-new directory outside this one, and run that copy against the archive:
+new directory outside this one, and run that copy against the archive. The address is the
+release of the verifier this archive was built with, named by its content: the SHA-256 of
+that release's `SHA256SUMS`.
 
 ```bash
-base=https://tersign.ai/verify/v1
+base=https://tersign.ai/verify/sha256/e6847fef96410110f52ebe6e21c8caab6b750a90bf6eca4a4abe4fe731d96f1f
 OOB=$(mktemp -d) &&
 curl -fsSL "$base/SHA256SUMS" -o "$OOB/SHA256SUMS" &&
+( cd "$OOB" && echo "${base##*/}  SHA256SUMS" | shasum -a 256 -c ) &&
 for f in verify_bundle.py keccak.py secp256k1.py; do curl -fsSL "$base/$f" -o "$OOB/$f"; done &&
 ( cd "$OOB" && shasum -a 256 -c SHA256SUMS ) &&
 python3 "$OOB/verify_bundle.py" . --signer <ledger address obtained out-of-band> &&
@@ -86,14 +89,14 @@ diff -r -x SHA256SUMS "$OOB" verify
 ```
 
 Each command runs only if the one before it succeeded, so the block exits 0 only when the
-published digests match what you fetched, the fetched verifier passes the archive, and the
-bundled `verify/` is byte-identical to the fetched copy. The fetch goes into the directory
+fetched `SHA256SUMS` hashes to the address you asked for, the files match it, the fetched
+verifier passes the archive, and the bundled `verify/` is byte-identical to the fetched copy. The fetch goes into the directory
 `mktemp -d` has just made, never into this one: a file written here is one `manifest.json`
 does not list, and `files.closedSet` fails on it. The last line prints nothing on an honest
 bundle (`-x` leaves out `SHA256SUMS`, which `verify/` does not carry), and a difference is
-itself the finding. The published copy is the same source, kept byte-identical by a build
-check; ordinary fixes ship in place and move the digests in `SHA256SUMS`, so diffing that file
-is how you notice. The same caution is why section 2 never uses `anchors/freetsa-cacert.pem`:
+itself the finding. The files at that address never change: an address names one set of
+bytes. The newest release is at `https://tersign.ai/verify/latest/`; once that is a later
+release, it differs from `verify/` by design. The same caution is why section 2 never uses `anchors/freetsa-cacert.pem`:
 it fetches FreeTSA's own certificate. For the `--signer` placeholder, here and in section 1,
 see "What PASS means" above: the published test-key address for a synthetic archive, the
 address from `https://tersign.ai/v1/ledger` for real records.
@@ -194,6 +197,23 @@ ots info anchors/proof.ots         # offline parse; a confirmed proof prints its
   recovers the ledger key
 - a re-encoded anchor signature (the same forms) → `anchors.ledgerSignature` FAIL, although it
   recovers the ledger key
+- a receipt whose `payload.version` is not the integer 1 (a version-2 payload, or `true`), signed
+  by the party and re-chained and re-anchored around it → `record[n].partySig` FAIL, although the
+  signature recovers the party key: version 1 is the only receipt version the x402
+  offer-and-receipt extension defines
+- a receipt signature re-encoded (recovery byte 0 or 1, upper-case hex, no `0x`, its high-s twin,
+  whitespace inside or around it, a trailing newline) → `record[n].partySig` FAIL, although the
+  forms without whitespace recover the party key, and a space or newline between two bytes of the
+  hex (before v, for instance) still recovers it in a verifier that skips whitespace between bytes
+- an action record's attestation signature with whitespace inside or around it, a trailing
+  newline or no `0x`, or its high-s twin → `record[n].partySig` FAIL, although the forms without
+  whitespace recover the party key, and a space or newline between two bytes of the hex (before
+  v, for instance) still recovers it in a verifier that skips whitespace between bytes; upper-case
+  hex digits and recovery byte 0 or 1
+  pass
+- an action record whose attestation `payload.version` is not the JSON integer 1 (`1.5`, `"1"`,
+  `true`, `"0x1"`, 2) → `record[n].partySig` FAIL before recovery: the attestation sits outside
+  the counter-signed digest, so a holder can respell the version without a key
 - an anchor proof over a different root → `anchors.merklePath` / step-2 FAIL
 - a gapped or forked chain → `chain.density` / `record[n].prevDigest` FAIL
 - an extra or missing file (decoys included, at the top level or in a folder) → `files.closedSet` FAIL
@@ -211,16 +231,27 @@ ots info anchors/proof.ots         # offline parse; a confirmed proof prints its
 - party key runs (`manifest.party.signers`) that do not tile 1 to the last record, the last run included → `manifest.party.signers.tiles` FAIL
 - a truncated or rewritten archive re-counter-signed and re-anchored under a **published test key**, with that key's address passed as `--signer` → PASS on every check, because anyone can sign with that key; the verdict stays `PASS (integrity-only)` and a `SIGNER:` line names the key. Only section 2 tells it apart from the original: the original token covers the original batch root, not the new one, and a fresh token over the new root states a later time
 
-`reject-tests.sh` cases 1–38 run against this bundle and cover every class above except the
-prefix shipped with an earlier anchor, which needs an anchor this archive does not carry. The
-archive re-signed under a published test key (case 31, which requires the `SIGNER:` line and
-refuses any verdict claiming authorship) has the same archive under a ledger key outside the
+On the synthetic worked example, `reject-tests.sh` cases 1–62 run and cover every class above
+except the prefix shipped with an earlier anchor, which needs an anchor that example does not
+carry. On an archive whose manifest says mode `production`, cases 31–34 and 36–49 print NOT RUN:
+they re-sign with the published test keys a synthetic archive is built with, and assume the worked
+example's four records. Cases 50–62 run on any archive whose action record's attestation signature
+is in canonical form (`0x`, 130 lower-case hex digits, recovery byte 27 or 28), the form they
+re-encode from; on an archive with no action record, or one whose signature is in another accepted
+form (upper-case hex, recovery byte 0 or 1), they print NOT RUN with the reason. The archive
+re-signed under a published test key (case 31, which requires the `SIGNER:` line and refuses any
+verdict claiming authorship) has the same archive under a ledger key outside the
 published table as its accepting twins: without `--party` (32), with a `--party` key that is a published
 test key (33), with one that is not (36), and with an earlier party key run under a third key
 (37). Each rejecting case requires the named check to fail; the full
 sets of five and four FAIL lines above are what the verifier printed when run on those shapes.
-Each re-encoding class sits beside an accepting twin (upper-case hex digits behind `0x`) —
-two-sided by policy, because an all-happy-path artifact proves nothing. Reproduce
+The counter-signature and anchor-signature re-encoding classes each sit beside an accepting twin
+(upper-case hex digits behind `0x`, cases 15 and 23). The receipt classes' twins are case 42 (the
+same rebuild, the receipt left a canonical version-1 receipt) and case 49 (whitespace and a newline
+in the JSON file, outside the signature string). The action-record classes' twins are cases 54–56
+(whitespace in the JSON file, upper-case hex digits, recovery byte 0 or 1) and case 62 (the version
+written as the integer 1 by the same rewrite as cases 57–61). Two-sided by policy,
+because an all-happy-path artifact proves nothing. Reproduce
 any of them yourself: mutate the named field and re-run step 1; the verifier prints the
 failing check by name.
 
@@ -254,7 +285,7 @@ unsigned claims on the `TIME:` and `UNAUTHENTICATED` lines are printed JSON-quot
 | `record[n].format` | the record is a receipt or an action-record envelope of the stated format |
 | `record[n].artifactDigest` | the recomputed artifact digest equals the record's and the chain's |
 | `record[n].actionDigest` | an action record's attestation binds that digest and its `occurredAt` |
-| `record[n].partySig` | the party signature recovers to the party key for that seq |
+| `record[n].partySig` | the party signature recovers to the party key for that seq; a receipt must also be version 1 (`payload.version` the integer 1, `payload.issuedAt` an integer) and its signature exactly `0x` then 130 lower-case hex digits, recovery byte 27 or 28, low-s; an action record's attestation signature exactly `0x` then 130 hex digits (either case), and its `payload.version` the JSON integer 1 |
 | `record[n].prevDigest` | `prevDigest` is the previous record's artifact digest (`null` at seq 1) |
 | `record[n].linkDigest` | the recomputed link digest equals the record's and the chain's |
 | `chain.links[n].accDigest` | the accumulator after link n equals the chain's value |

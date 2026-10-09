@@ -6,7 +6,12 @@ Usage:
 
 Checks steps 1-7 of spec/evidence-bundle-v1.md entirely offline: closed file set +
 integrity, artifact digests (JCS + keccak256), party EIP-712 recovery (receipt and
-action-record formats), chain density / prevDigest continuity / head, the commitment
+action-record formats; a receipt is refused unless payload.version is the JSON integer 1,
+payload.issuedAt is a JSON integer, and its signature is "0x" then exactly 130 lower-case hex
+digits with recovery byte 27 or 28 and low-s; an action record is refused unless its attestation
+payload.version is the JSON integer 1 and its signature is "0x" then exactly 130 hex digits with
+nothing else in the string), chain density /
+prevDigest continuity / head, the commitment
 accumulator (acc folded over every counter-signed link) and the anchored commitment
 object, ledger counter-signature recovery, anchor relation + merkle replay, anchor
 signature. Step 8 (RFC-3161 / OTS time bound) is NOT checked here: this tool never opens
@@ -41,6 +46,7 @@ Exit 0 = every check PASS. Exit 1 = any FAIL. No network. No third-party imports
 import hashlib
 import json
 import os
+import re
 import shlex
 import sys
 import unicodedata
@@ -227,6 +233,131 @@ def receipt_eip712_digest(payload: dict) -> bytes:
         _s(payload["resourceUrl"]) + _s(payload["payer"]) + _u256(payload["issuedAt"]) +
         _s(payload["transaction"]))
     return keccak_256(b"\x19\x01" + domain_sep + struct)
+
+
+def _json_type(v) -> str:
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "a boolean"
+    if isinstance(v, float):
+        return "a non-integer number"
+    if isinstance(v, str):
+        return "a string"
+    if isinstance(v, list):
+        return "an array"
+    if isinstance(v, dict):
+        return "an object"
+    return type(v).__name__
+
+
+# The shape of a party signature, decided on the STRING before anything decodes it: "0x" then
+# exactly 130 hex digits and nothing else, anchored with \A and \Z (a `$` also matches before a
+# final newline). bytes.fromhex skips ASCII whitespace, so a string that fails this, such as one
+# with a space before v or a trailing newline, never reaches it. Receipts (receipt_refusal) and
+# action-record attestations (action_signature_refusal) both apply it; only receipts add the rest
+# of the one accepted encoding (_RECEIPT_SIG_LOWER, v 27/28, low-s before recovery).
+_RECEIPT_SIG_HEX = re.compile(r"\A0x[0-9a-fA-F]{130}\Z")
+_RECEIPT_SIG_LOWER = re.compile(r"\A0x[0-9a-f]{130}\Z")
+
+
+def receipt_refusal(art):
+    """Why a receipt's party signature is refused before recovery, or None. Every rule is decided
+    on the file's JSON values and the signature string before recovery runs. The reason texts are
+    this tool's own and are not claimed to match an SDK's. Only verdicts were compared, on
+    2026-10-08, over fifteen receipt variants (each signature re-encoding below, v 0/1, version 2,
+    true and 1.0, issuedAt as a string, true, a float and 2^53 + 1): the Python SDK 0.2.3
+    verify_receipt gave the same verdict on all fifteen; the npm SDK 0.6.2 verifyReceipt accepts a
+    version or issuedAt written as a float (1.0), which this refuses, and refuses an issuedAt above
+    2^53 - 1, which this accepts. No other agreement is claimed.
+
+    payload.version and payload.issuedAt are JSON integers. A JSON true, a string or a float is
+    refused, as the Python SDK refuses them: the signature covers the number, so another spelling
+    of it is unsigned text (a true encodes to the same uint256 as 1).
+
+    payload.version is 1. The x402 offer-and-receipt extension selects the EIP-712 types by
+    version and defines only version 1; without this rule a version-2 payload the party signed
+    recovers under the version-1 types and passes.
+
+    The signature is its one accepted encoding: "0x" then exactly 130 lower-case hex digits
+    (r || s || v) with nothing else in the string, v 27 or 28, 1 <= r, s < n, and s <= n/2. Recovery
+    alone would also accept v 0 or 1, upper-case hex, a missing "0x", whitespace or a trailing
+    newline, and the high-s twin; each recovers the same signer from a string whose bytes, and so
+    whose content digest, differ."""
+    payload = art.get("payload") if isinstance(art, dict) else None
+    if not isinstance(payload, dict):
+        return "payload must be an object"
+    for field in ("version", "issuedAt"):
+        n = payload.get(field)
+        if type(n) is not int:  # bool is an int subclass and is refused here
+            return ("payload.%s must be a JSON integer, not %s: the signature covers the number, "
+                    "so another spelling of it is unsigned text" % (field, _json_type(n)))
+        if not 0 <= n < 2 ** 256:
+            return "payload.%s is outside the uint256 range" % field
+    version = payload["version"]
+    if version != 1:
+        shown = str(version) if len(str(version)) <= 32 else str(version)[:32] + "..."
+        return ("payload.version %s is not supported: version 1 is the only receipt version the "
+                "x402 offer-and-receipt extension defines" % shown)
+    sig = art.get("signature")
+    if not isinstance(sig, str):
+        return "signature must be a 0x-prefixed hex string of 65 bytes (r||s||v), not %s" % _json_type(sig)
+    if not _RECEIPT_SIG_HEX.match(sig):
+        return "signature must be a 0x-prefixed hex string of 65 bytes (r||s||v)"
+    if not _RECEIPT_SIG_LOWER.match(sig):
+        return "signature hex must be lower-case (non-canonical)"
+    raw = bytes.fromhex(sig[2:])
+    v = raw[64]
+    if v in (0, 1):
+        return "recovery id %d rejected (non-canonical): v must be 27 or 28" % v
+    if v not in (27, 28):
+        return "unsupported recovery id %d" % v
+    r = int.from_bytes(raw[0:32], "big")
+    s = int.from_bytes(raw[32:64], "big")
+    if not (1 <= r < ec.N and 1 <= s < ec.N):
+        return "r/s out of range"
+    if s > ec.N // 2:
+        return "high-s signature (s > n/2) rejected before recovery (non-canonical)"
+    return None
+
+
+def action_signature_refusal(sig):
+    """Why an action record's attestation signature is refused before recovery, or None. The
+    string is "0x" then exactly 130 hex digits with nothing else in it (_RECEIPT_SIG_HEX), so a
+    space before v, a trailing newline or a missing "0x" is refused, as the npm SDK 0.6.2
+    verifyActionRecord refuses them ("invalid signature length"); without this rule bytes.fromhex
+    skips the whitespace and the string recovers the party key. Upper-case hex and recovery byte
+    0/1 stay accepted, as that SDK accepts them. A high-s signature is refused at recovery
+    (secp256k1.recover_pubkey), which that SDK accepts. Compared on 2026-10-08 over eighteen
+    encodings of one attestation signature (canonical; whitespace before v, inside, before and
+    after it; no "0x"; "0X"; upper and mixed case; v 0/1, 2 and 29; the high-s twin; one byte
+    short and long; r or s zero; r = n), the verdicts differ only on the high-s twin. No other
+    agreement is claimed."""
+    if not isinstance(sig, str):
+        return "attestation signature must be a 0x-prefixed hex string of 65 bytes (r||s||v), not %s" % _json_type(sig)
+    if not _RECEIPT_SIG_HEX.match(sig):
+        return "attestation signature must be a 0x-prefixed hex string of 65 bytes (r||s||v)"
+    return None
+
+
+def action_version_refusal(payload):
+    """Why an action record's attestation payload.version is refused before recovery, or None: it is
+    the JSON integer 1, the one version the ledger's action ingest accepts (payload.version !== 1 is
+    refused there). A JSON true, a string (a hex string included) or a float is refused, as receipts
+    refuse them: the signature covers the number, so another spelling of it is unsigned text, and
+    the attestation sits outside the counter-signed digest, so a holder can respell it without a
+    key. Measured on 2026-10-08 against the npm SDK 0.6.2 verifyActionRecord, which passes the
+    version to BigInt: it accepts true, "1", "0x1" and 1.0, all refused here, and refuses 1.5, and 2
+    when given the expected signer, as this does. No other agreement is claimed."""
+    n = payload.get("version")
+    if type(n) is not int:  # bool is an int subclass and is refused here
+        return ("payload.version must be a JSON integer, not %s: the signature covers the number, "
+                "so another spelling of it is unsigned text" % _json_type(n))
+    if n != 1:
+        shown = str(n) if len(str(n)) <= 32 else str(n)[:32] + "..."
+        return ("payload.version %s is not supported: version 1 is the only action-record version "
+                "the ledger accepts" % shown)
+    return None
 
 
 def action_eip712_digest(payload: dict) -> bytes:
@@ -518,9 +649,15 @@ def main(bundle: str, expected_ledger=None, expected_party=None) -> int:
                 check("record[%d].actionDigest" % r["seq"],
                       payload.get("actionDigest") == d and payload.get("occurredAt") == art["record"].get("occurredAt"),
                       "attestation payload must bind digestOf(record) and record.occurredAt", on_pass="")
+                why = action_version_refusal(payload) or action_signature_refusal(art["attestation"].get("signature"))
+                if why is not None:
+                    raise ValueError(why)
                 addr = ec.recover_address(action_eip712_digest(payload), art["attestation"]["signature"])
                 check("record[%d].partySig" % r["seq"], addr.lower() == action_signer, addr)
             else:
+                why = receipt_refusal(art)
+                if why is not None:
+                    raise ValueError(why)
                 addr = ec.recover_address(receipt_eip712_digest(art["payload"]), art["signature"])
                 check("record[%d].partySig" % r["seq"], addr.lower() == receipt_signer_for(r["seq"]), addr)
             party_keys.add(addr.lower())

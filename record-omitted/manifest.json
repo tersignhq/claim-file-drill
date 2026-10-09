@@ -27,7 +27,7 @@
   },
   "files": {
     "MAPPING.md": "sha256:4a6d206f315cf8665c53548b43eb35e2bf0a787d4e13bd3eea39ae3d69bbd7f1",
-    "VERIFY.md": "sha256:7d0a7d5b1eedee8d90779d656e87c896b86c671a617a57eb8d010f646bbc6bca",
+    "VERIFY.md": "sha256:447642ce8bbe893f75b22583036dcb77472e75bba19c24b5d652bba3984e7fe5",
     "anchors/anchor.json": "sha256:5f3450d09a18400e439a873bad9c03b77b433c98ee29f0d3616fbbbfe93113fe",
     "anchors/freetsa-cacert.pem": "sha256:2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438",
     "anchors/proof.ots": "sha256:e2b7117a1b30ae83460a7959780b1bcc929fdf3ff33f8f5a05f7012e3db64495",
@@ -38,6 +38,6 @@
     "records/000003.json": "sha256:5041b049ecce384113c7dfea4c9e95038bfd1674a755ebb496ad373a730a8f2d",
     "verify/keccak.py": "sha256:f3fa3c35a309cc7d205b09b52c883a7fa9511f831800c514d5274e100bd0e8ce",
     "verify/secp256k1.py": "sha256:e300f067a0135cf62d07e426954ccf91edb317f94eb00fdcab6ef127430ff36c",
-    "verify/verify_bundle.py": "sha256:b04ff4cb71a51ee47b407a09bebe106d4ce40238590f8efa59a2463ae302973c"
+    "verify/verify_bundle.py": "sha256:2624e161db0dbc41fd7ae8b5934d39602420cdf1f63b437154b1b2c4ccca6119"
   }
 }

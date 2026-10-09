@@ -116,10 +116,10 @@ A `FAILED` verification prints no time, and the block exits nonzero. Some OpenSS
 
 ## 6. Do not trust the checker in this repository
 
-`verify/` holds the three files published at https://tersign.ai/verify/v1/ as of the `synced_at` date in `.sync-provenance`: this repository is synced only while the two match. The published files can change after that date, so compare them with the published digests before you rely on a verdict. Download the list, point it at `verify/`, and check it with the tool your system has:
+`verify/` holds the three files of the verifier release published at https://tersign.ai/verify/sha256/e6847fef96410110f52ebe6e21c8caab6b750a90bf6eca4a4abe4fe731d96f1f/. That address is the SHA-256 of the release's `SHA256SUMS`, so the files behind it never change. Compare them with `verify/` before you rely on a verdict: download the list, point it at `verify/`, and check it with the tool your system has:
 
 ```bash
-curl -fsSL https://tersign.ai/verify/v1/SHA256SUMS -o published-SHA256SUMS
+curl -fsSL https://tersign.ai/verify/sha256/e6847fef96410110f52ebe6e21c8caab6b750a90bf6eca4a4abe4fe731d96f1f/SHA256SUMS -o published-SHA256SUMS
 sed 's#  #  verify/#' published-SHA256SUMS > published-verify.sums
 shasum -a 256 -c published-verify.sums           # macOS
 sha256sum -c published-verify.sums               # Linux (GNU coreutils)
@@ -128,7 +128,7 @@ sha256sum -c published-verify.sums               # Linux (GNU coreutils)
 # verify/secp256k1.py: OK
 ```
 
-Those three `OK` lines hold as of the `synced_at` date. A `FAILED` line means the published checker changed after it: run the published copy instead.
+A `FAILED` line means the checker in this repository is not the published release: run the published copy instead. `shasum -a 256 published-SHA256SUMS` prints the digest in the address, which shows the list is the one the address names. Later releases: the newest is at https://tersign.ai/verify/latest/.
 
 `CHECKSUMS` holds the same digests for an offline comparison: `shasum -a 256 -c CHECKSUMS` on macOS, `sha256sum -c CHECKSUMS` on Linux. Each archive also carries its own copy of the checker, under `<folder>/verify/`. A holder controls that copy too, which is why you run the one you compared. Each archive's `VERIFY.md` lists every check the checker prints and what a failure of each class means.
 
