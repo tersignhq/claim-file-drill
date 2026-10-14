@@ -39,6 +39,16 @@ manifest field are the holder's own words, which the verifier prints as `UNAUTHE
   address fails `trust.ledgerSigner==--signer`, every `record[n].countersig` and
   `anchors.ledgerSignature` (six checks in the four-record worked example), which is the right
   result: the synthetic records were not signed with it.
+- **Synthetic records counter-signed by the production ledger key** (an archive Tersign hands
+  you as that): the records are synthetic, as in the worked example, and no real party, payer or
+  transaction stands behind them. The party signs with a published test key again: account #0
+  of the Hardhat/Anvil default dev mnemonic, `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`. The
+  counter-signatures and the anchor signature are the production ledger's: pass the production
+  ledger address published at `https://tersign.ai/v1/ledger`, fetched yourself. Every check
+  passes and the verdict is `integrity AND counter-signer authorship`, with a `SIGNER:` line
+  saying the party key is a published test key, so the verdict never says who wrote the records.
+  Passed the worked example's test ledger key instead, this archive fails, which is the right
+  result.
 
 The keys the verifier names as published test keys are the twenty accounts of the standard
 development mnemonic that Hardhat and Anvil ship (`test test … junk`) and private keys 1, 2 and
@@ -98,8 +108,9 @@ itself the finding. The files at that address never change: an address names one
 bytes. The newest release is at `https://tersign.ai/verify/latest/`; once that is a later
 release, it differs from `verify/` by design. The same caution is why section 2 never uses `anchors/freetsa-cacert.pem`:
 it fetches FreeTSA's own certificate. For the `--signer` placeholder, here and in section 1,
-see "What PASS means" above: the published test-key address for a synthetic archive, the
-address from `https://tersign.ai/v1/ledger` for real records.
+see "What PASS means" above: the published test-key address for the synthetic worked example,
+the address from `https://tersign.ai/v1/ledger` for real records and for synthetic records
+counter-signed by the production ledger key.
 
 ## 1. Structural + cryptographic checks (python, stdlib only)
 
