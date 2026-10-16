@@ -132,4 +132,18 @@ A `FAILED` line means the checker in this repository is not the published releas
 
 `CHECKSUMS` holds the same digests for an offline comparison: `shasum -a 256 -c CHECKSUMS` on macOS, `sha256sum -c CHECKSUMS` on Linux. Each archive also carries its own copy of the checker, under `<folder>/verify/`. A holder controls that copy too, which is why you run the one you compared. Each archive's `VERIFY.md` lists every check the checker prints and what a failure of each class means.
 
+## 7. Reproduced by People's Court, 30 August 2026
+
+On 30 August 2026, People's Court checked the synthetic example archive Tersign sent it that day. That archive holds the same four records, chain commitment, batch root and RFC 3161 token as intact/, and its party and counter-signer keys are published test keys; the time stamp is FreeTSA's. People's Court's report, quoted with permission:
+
+> We reviewed the archive statically, ran the bundled verifier in a network-blocked, read-only sandbox, and independently reproduced the file hashes, party signatures, ledger countersignatures, chain links and accumulator, commitment digest, and anchor relationship using our own tooling. The bundled verifier returned PASS, and our independent check passed all 34 checks for this synthetic bundle.
+>
+> We also verified the RFC-3161 timestamp token against the certificate included in the archive. We have not independently authenticated that bundled certificate or a production Tersign signing key, and the OpenTimestamps proof is still pending. Accordingly, this result establishes internal integrity and signatures to the labeled synthetic test addresses. It does not establish the truth of the underlying events, rule out a conflicting chain published elsewhere, or determine admissibility or reliability in a case.
+>
+> […]
+>
+> This remains a synthetic, evidence-only interoperability review: no live endpoint, credentials, production data, integration commitment, or admissibility or reliability determination.
+
+The record-omitted/ and back-dated/ folders and tamper.py were not part of that archive. Since 30 August, the checker has been revised (the release in verify/, section 6) and the OpenTimestamps proof has completed (section 4); the report predates both.
+
 — Tersign
